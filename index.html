@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<title>Sistemes Multijugador</title>
+	</head>
+	<body>
+		<div id="n_login">
+			<header><h1>Login</header></h1>
+			<input type="text" id="L_Username" placeholder="Usuari" /><br>
+			<input type="password" id ="L_Password" placeholder="Password" /><br><br>
+			<button id="Login">Login</button>
+			<button id="Anar_a_registre">Anar a registre</button><br>
+			<p>Has oblidat la contrasenya? <a href="http://localhost:80/register/recover_password/index.php" target="_blank">Fes clic aquí</a></p>
+		</div>
+		
+		<div id="n_registre">
+			<header><h1>Registre</header></h1>
+			<input type="text" id="R_Username" placeholder="Usuari" /><br>
+			<input type="text" id ="R_Email" placeholder="Email" /><br>
+			<input type="password" id ="R_Password" placeholder="Password" /><br><br>
+			<button id="Registre">Registrar</button>
+			<button id="Anar_a_login">Anar a login</button><br>
+			<p>Has oblidat la contrasenya? <a href="http://localhost:80/register/recover_password/index.php" target="_blank">Fes clic aquí</a></p>
+		</div>
+
+		<div id="login" style="display: none;"> text </div>
+		
+		<div id="registre_pag" style="display: none;">
+			Registre correcte.<br><br>
+			<button id="Retornar">Retornar</button>
+		</div>
+		
+		<canvas id="ctx" width="800" height="600" style="border:3px solid #000000;"></canvas>
+		
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+		<script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+		<script type="text/javascript">
+			var ctx = document.getElementById("ctx").getContext("2d");
+			var socket = io();
+			var html_string;
+			
+			$("#ctx").hide();
+			$("#n_registre").hide();
+			
+			$(document).ready(function(){
+				$("#Login").click(function(e){
+					socket.emit("login", {
+						user: $("#L_Username").val(),
+						pass: $("#L_Password").val()
+					});
+				});
+			});
+			
+			$(document).ready(function(){
+				$("#Registre").click(function(e){
+					socket.emit("registre", {
+						user: $("#R_Username").val(),
+						email: $("#R_Email").val(),
+						pass: $("#R_Password").val(),
+						datetime: new Date($.now())
+					});
+				});
+			});
+			
+			$(document).ready(function(){
+				$("#Anar_a_login").click(function(e){
+					$("#n_registre").hide();
+					$("#n_login").show();
+				});
+			});
+			
+			$(document).ready(function(){
+				$("#Anar_a_registre").click(function(e){
+					$("#n_login").hide();
+					$("#n_registre").show();
+				});
+			});
+			
+			$(document).ready(function(){
+				$("#Retornar").click(function(e){
+					$("#registre_pag").hide();
+					$("#n_login").show();
+				});
+			});
+
+			socket.on('logged_in', function(name){
+				$("#n_login").hide();
+				$("#login").html("Usuari: " + name);
+				$("#login").show();
+				$("#ctx").show();
+				socket.emit("connect_player");
+			});
+			
+			socket.on('registrat', function(name){
+				$("#n_registre").hide();
+				$("#registre_pag").show();
+			});
+
+			socket.on('invalid', function(){
+				alert("Usuari i/o contrasenya invalids.");
+			});
+
+			socket.on('wrong', function(){
+				alert("Error.");
+			});
+			
+			socket.on('wrong_length', function(){
+				alert("La contrasenya i l'usuari han de tenir més de 4 caràcters.");
+			});
+
+			socket.on('exists', function(){
+				alert("L'usuari ja existeix.");
+			});
+
+			socket.on('no_exists', function(){
+				alert("L'usuari no existeix.");
+			});				
+			
+			socket.on('newPositions',function(data){
+				ctx.clearRect(0,0,800,600);
+				for(var i = 0 ; i < data.length; i++){
+					ctx.fillStyle = data[i].color;
+					ctx.fillRect(data[i].x, data[i].y, 30, 30);
+				}
+			});
+			
+			socket.on('pass_quality',function(data){
+				var url = "https://api.pwnedpasswords.com/range/"+data.slice(0,5);
+				var search = (data.slice(5)).toUpperCase();
+				$.get(url, function(html_string){
+					var pos_search = html_string.indexOf(search);
+					if (pos_search >= 0){
+						var quantitat = "";
+						var i = 36;
+						while(html_string[pos_search+i] != '\n'){
+							quantitat += html_string[pos_search+i]
+							i++;
+						}
+						quantitat = quantitat.slice(0,quantitat.length-1);
+						alert("Alerta!\nAquesta contrasenya ha estat trobada "+quantitat+" vegades en alguna violació de dades, el seu ús no és recomanable.\nFONT: haveibeenpwned.com");
+					} else  alert("Perfecte!\nAquesta contrasenya no s'ha trobat en cap violació de dades.\nFONT: haveibeenpwned.com");
+				});
+			});
+			
+			document.onkeydown = function(event){
+				if(event.keyCode === 68)    //d
+					socket.emit('keyPress',{inputId:'right',state:true});
+				else if(event.keyCode === 83)   //s
+					socket.emit('keyPress',{inputId:'down',state:true});
+				else if(event.keyCode === 65) //a
+					socket.emit('keyPress',{inputId:'left',state:true});
+				else if(event.keyCode === 87) // w
+					socket.emit('keyPress',{inputId:'up',state:true});
+			}
+			
+			document.onkeyup = function(event){
+				if(event.keyCode === 68)    //d
+					socket.emit('keyPress',{inputId:'right',state:false});
+				else if(event.keyCode === 83)   //s
+					socket.emit('keyPress',{inputId:'down',state:false});
+				else if(event.keyCode === 65) //a
+					socket.emit('keyPress',{inputId:'left',state:false});
+				else if(event.keyCode === 87) // w
+					socket.emit('keyPress',{inputId:'up',state:false});
+			}
+		</script>
+	</body>
+</html>
